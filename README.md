@@ -75,7 +75,7 @@ Pulled the container logs to see if the exploit left a visible trace:
 
     docker logs juiceshop --tail 50
 
-![Docker logs showing payload](screenshots/docker-logs.png)
+![Docker logs showing payload](screenshots/docker logs.png)
 
 **Result:** the payload and a success indicator both showed up. That's the raw signal
 a detection rule would actually need to match on.
