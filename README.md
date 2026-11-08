@@ -59,7 +59,7 @@ Reproduced it twice, including after rebuilding the container from scratch with 
 database — confirms the bypass isn't tied to one specific seeded account, it's the
 query logic itself.
 
-[screenshot: successful login bypass, token redacted]
+(screenshots/bypass.png)
 
 ## Part 3 — Scripting the Exploit
 
