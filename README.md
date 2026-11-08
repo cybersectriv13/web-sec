@@ -1,24 +1,19 @@
-# Web Security Fundamentals: Port Scanning & SQL Injection
+# Web Security: Port Scanning & SQL Injection
 
-Hands-on lab to build the fundamentals from the ground up instead of just running tools
-I don't fully understand. Built a TCP port scanner from scratch to see what Nmap is
+Built a TCP port scanner from scratch to see what Nmap is
 actually doing, then manually exploited and scripted a SQL injection vulnerability
 against OWASP Juice Shop, running locally in Docker.
 
 ## Motive
 
-I'm a current cybersecurity engineer and grad student coming from a governance/RMF
-background, and I wanted to build real offensive fundamentals instead of just reading
-about them. I've spent most of my career on the assessment side — reading scan output,
-not generating it. This lab was me forcing myself to understand *why* a scan or an
+I'm a current cybersecurity engineer and grad student, and I am building real offensive skills. This lab was me forcing myself to understand *why* a scan or an
 exploit works instead of trusting the tool to do it for me. Port scanning and SQLi felt
-like the right starting point: foundational, well-documented, and directly relevant to
-findings I already review in my day job.
+like the right starting point: foundational, well-documented, and a good point to build off of.
 
 ## Environment
 
 - Target: OWASP Juice Shop (`bkimminich/juice-shop`), Docker container, mapped to `localhost:8080`
-- Tooling: Python 3 (stdlib `socket`, `requests`), Nmap
+- Tooling: Python 3, Nmap
 - Host: macOS
 
 ## Part 1 — Port Scanner
@@ -34,16 +29,16 @@ Scanned 8000-8100 with both:
     nmap -p8000-8100 localhost
 
 **Result:** both found ports 8021 and 8080 open. 8080 is Juice Shop's mapped app port.
-8021 I wasn't expecting — good reminder that containers expose more than the one port
-you think you're testing, and scanning beats assuming scope.
+8021 I wasn't expecting; reminder that containers can expose more than the port(s)
+you think you're testing.
 
 ## Part 2 — SQL Injection Login Bypass
 
 Target: Juice Shop login form.
 
-Payload: `' OR 1=1--` in the email field, anything in the password field.
+Payload: `' OR 1=1--` in the email field, any character in the password field.
 
-**Why it works:** the backend is almost certainly building a query like:
+**Why it works:** The backend is almost certainly building a query like:
 
     SELECT * FROM Users WHERE email = '<input>' AND password = '<hash>'
 
@@ -56,17 +51,17 @@ Maps to CWE-89 (SQL Injection), and to ATT&CK T1190 (Exploit Public-Facing Appli
 in an internet-facing scenario.
 
 Reproduced it twice, including after rebuilding the container from scratch with a fresh
-database — confirms the bypass isn't tied to one specific seeded account, it's the
+database — confirms the bypass isn't tied to one specific account; it's the
 query logic itself.
 
 ![Successful login bypass, token redacted](screenshots/bypass.png)
 
 ## Part 3 — Scripting the Exploit
 
-`sqli_exploit.py` hits Juice Shop's login API directly with the same payload, to see
-what this looks like automated instead of done by hand in a browser.
+`sqli_exploit.py` hits Juice Shop's login API directly with the same payload to see
+what this looks like automated instead of done in a browser.
 
-**Result:** `Login bypass succeeded`, valid session token returned in the JSON response.
+**Result:** `Login bypass succeeded`; a valid session token returned in the JSON response.
 Confirms the API-level bypass matches what I did manually in the browser.
 
 ## Part 4 — What the Defender Sees
@@ -77,11 +72,10 @@ Pulled the container logs to see if the exploit left a visible trace:
 
 ![Docker logs showing payload](screenshots/docker_logs.png)
 
-**Result:** the payload and a success indicator both showed up. That's the raw signal
-a detection rule would actually need to match on.
+**Result:** The payload and a success indicator both showed up. That's the raw signal
+a detection rule would actually need to match up.
 
-**Detection logic (written for Splunk, since that's what we use at work — this is
-documentation, not a deployed rule):**
+**Detection logic**
 
     index=web sourcetype=access_combined uri_path="*login*"
     | regex _raw="(?i)(or\s+1=1|union\s+select|--|;--)"
@@ -97,13 +91,9 @@ because Docker Desktop itself wasn't open — the CLI and the daemon are separat
 the daemon has to be up first. Fixed by starting Docker Desktop and confirming with
 `docker info`.
 
-**Ran the script from the wrong directory.** `python3 port_scanner.py` threw
-`No such file or directory` because I hadn't saved the file yet / was in a different
-folder than where it lived. Checked with `pwd`/`ls` before running anything after that.
-
 **Scanned the wrong port range.** My first scan used the default 1-1024 range, which
 didn't cover Juice Shop's actual ports (8021, 8080). No error, just an empty result —
-looked like a failed scan but was actually a correctly-run scan of the wrong range.
+looked like a failed scan but was actually a correctly run scan of the wrong range.
 Fixed by scoping it to 8000-8100.
 
 **`ModuleNotFoundError: No module named 'requests'`.** Homebrew's Python is
@@ -118,7 +108,6 @@ Now I check `docker ps -a` first before assuming `start` will work.
 
 ## Next Steps
 
-- Build out an AD environment for lateral movement and credential attacks
-  (Kerberoasting, BloodHound), with a detection written for each technique — same
-  attack/detect pairing as here, just a bigger environment.
+- Build out an environment that mirrors a SOHO rather than a single container target. The goal is to understand how web app, network, and host-level vulns interact in a more realistic environment. Possibly build detections to catch these attack vectors.
+
 - Add a second vulnerability class (stored XSS) for comparison.
